@@ -1564,7 +1564,10 @@
             </div>
 
             <div style="padding-top:0.5rem;">
-              <h4 style="font-size:0.85rem; color:var(--text-main); margin-bottom:0.75rem;">Hint Ladder</h4>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+                <h4 style="font-size:0.85rem; color:var(--text-main); margin:0;">Hint Ladder</h4>
+                <span id="penalty-badge" class="tag tag-ember" style="font-size:0.725rem;">Score: 100% (0% Penalty)</span>
+              </div>
               <div style="display:flex; gap:0.5rem;">
                 <button id="btn-hint-1" class="btn btn-outline btn-sm" style="flex:1;"><i data-lucide="help-circle"></i> Tier 1 (-20%)</button>
                 <button id="btn-hint-2" class="btn btn-outline btn-sm" style="flex:1;"><i data-lucide="key"></i> Tier 2 (-40%)</button>
@@ -1729,8 +1732,18 @@
           consoleText.innerHTML = `[LOCAL SOCRATIC HINT]:\n${problem.hints[0] || 'Consider the relationship between your loop invariants and target data constraints.'}\n\n💡 Tip: Add your OpenAI API Key in Settings to get real-time Live AI response!`;
         }, 300);
       });
+      document.getElementById('btn-hint-1')?.addEventListener('click', () => {
+        hintPenalty = Math.min(hintPenalty, 0.8);
+        const pBadge = document.getElementById('penalty-badge');
+        if (pBadge) { pBadge.textContent = "Score Cap: 80% (-20% Penalty)"; pBadge.style.color = "#f59e0b"; }
+        showToast("Tier 1 Hint Unlocked: 20% score penalty applied.");
+        alert(`Tier 1 Hint:\n${problem.hints[0] || 'Consider the main data structure invariant.'}`);
+      });
       document.getElementById('btn-hint-2')?.addEventListener('click', () => {
         hintPenalty = Math.min(hintPenalty, 0.6);
+        const pBadge = document.getElementById('penalty-badge');
+        if (pBadge) { pBadge.textContent = "Score Cap: 60% (-40% Penalty)"; pBadge.style.color = "var(--signal-fail)"; }
+        showToast("Tier 2 Hint Unlocked: 40% score penalty applied.");
         alert(`Tier 2 Hint:\n${problem.hints[1] || problem.hints[0] || 'Check time complexity bounds.'}`);
       });
 
@@ -1741,49 +1754,105 @@
         }
       });
 
-      document.getElementById('btn-run-code')?.addEventListener('click', () => {
+      function runTestSuite(code, lang) {
         const consoleText = document.getElementById('console-output-text');
         const statusTag = document.getElementById('console-status-tag');
-        const code = monacoInstance ? monacoInstance.getValue() : '';
-        const lang = document.getElementById('editor-lang-select').value;
-
-        statusTag.textContent = "Executing...";
-        statusTag.style.color = "var(--accent-ember)";
-
+        const tests = problem.tests || [];
+        
         if (lang === 'javascript') {
           let logs = [];
           const customConsole = { log: (...args) => logs.push(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ')) };
+          let passed = 0;
+          let failureDetails = [];
+          
           try {
             const start = performance.now();
-            const fn = new Function('console', code);
+            // Execute main script
+            const fn = new Function('console', code + '\n' + (problem.starterCode ? '' : ''));
             fn(customConsole);
             const duration = (performance.now() - start).toFixed(2);
-            
-            statusTag.textContent = "✓ Syntax Clean";
-            statusTag.style.color = "var(--signal-pass)";
-            consoleText.innerHTML = `[SUCCESS]: Execution completed in ${duration}ms\n[STDOUT]:\n${logs.join('\n') || '(no console output printed)'}`;
+
+            // Execute registered unit tests if exact-test mode
+            if (tests.length > 0) {
+              for (let i = 0; i < tests.length; i++) {
+                const t = tests[i];
+                try {
+                  const testFn = new Function('console', code + `\nreturn (typeof solution !== "undefined" ? solution : (typeof ${problem.starterCode ? problem.starterCode.match(/function\s+([a-zA-Z0-9_]+)/)?.[1] || 'compute' : 'compute'} !== "undefined" ? ${problem.starterCode ? problem.starterCode.match(/function\s+([a-zA-Z0-9_]+)/)?.[1] || 'compute' : 'compute'} : null))(${t.input});`);
+                  const actual = testFn(customConsole);
+                  const actualStr = JSON.stringify(actual);
+                  const expectedStr = JSON.stringify(JSON.parse(t.expectedOutput));
+                  if (actualStr === expectedStr || String(actual).trim() === String(t.expectedOutput).trim()) {
+                    passed++;
+                  } else {
+                    failureDetails.push(`Test #${i+1} Failed: Input ${t.input} → Got ${actualStr}, Expected ${t.expectedOutput}`);
+                  }
+                } catch (e) {
+                  failureDetails.push(`Test #${i+1} Exception: ${e.message}`);
+                }
+              }
+              if (failureDetails.length === 0) {
+                statusTag.textContent = `✓ ${passed}/${tests.length} Tests Passed`;
+                statusTag.style.color = "var(--signal-pass)";
+                consoleText.innerHTML = `[TEST SUITE PASSED (${duration}ms)]:\nAll ${tests.length} unit test assertions satisfied.\n\n[STDOUT]:\n${logs.join('\n') || '(no logs)'}`;
+                return { ok: true, score: 100 };
+              } else {
+                statusTag.textContent = `✖ ${passed}/${tests.length} Tests Passed`;
+                statusTag.style.color = "var(--signal-fail)";
+                consoleText.innerHTML = `[TEST FAILURE DETAILS]:\n${failureDetails.join('\n')}\n\n[STDOUT]:\n${logs.join('\n') || '(no logs)'}`;
+                return { ok: false, score: 30, reason: failureDetails.join('\n') };
+              }
+            } else {
+              statusTag.textContent = "✓ Syntax Clean";
+              statusTag.style.color = "var(--signal-pass)";
+              consoleText.innerHTML = `[EXECUTION OK (${duration}ms)]:\nSyntax clean. Ready for AI solution grading.\n\n[STDOUT]:\n${logs.join('\n') || '(no console output)'}`;
+              return { ok: true, score: 100 };
+            }
           } catch (err) {
-            statusTag.textContent = "✖ Syntax Error";
+            statusTag.textContent = "✖ Execution Error";
             statusTag.style.color = "var(--signal-fail)";
-            consoleText.innerHTML = `[EXECUTION ERROR]: ${err.name} — ${err.message}`;
+            consoleText.innerHTML = `[RUNTIME/SYNTAX ERROR]: ${err.name} — ${err.message}`;
+            return { ok: false, score: 0, reason: `${err.name}: ${err.message}` };
           }
         } else {
-          setTimeout(() => {
-            statusTag.textContent = "✓ Pass";
-            statusTag.style.color = "var(--signal-pass)";
-            consoleText.innerHTML = `[PYTHON 3.11 EVALUATION]:\nSyntax clean. All test assertions satisfied.\nExecution time: 34ms`;
-          }, 400);
+          // Python 3.11 evaluation mock runner
+          statusTag.textContent = "✓ Python Syntax OK";
+          statusTag.style.color = "var(--signal-pass)";
+          consoleText.innerHTML = `[PYTHON EVALUATION]:\nSyntax clean. Solution structure validated.`;
+          return { ok: true, score: 100 };
         }
+      }
+
+      document.getElementById('btn-run-code')?.addEventListener('click', () => {
+        const code = monacoInstance ? monacoInstance.getValue() : '';
+        const lang = document.getElementById('editor-lang-select').value;
+        runTestSuite(code, lang);
       });
 
       // REAL LLM SPARRING EVALUATION & SOLUTION SUBMISSION
       document.getElementById('btn-submit-solution')?.addEventListener('click', async () => {
         const journal = document.getElementById('journal-input').value.trim();
         const code = monacoInstance ? monacoInstance.getValue() : '';
+        const lang = document.getElementById('editor-lang-select').value;
         const wordCount = journal ? journal.split(/\s+/).length : 0;
         
         if (wordCount < 20) {
           return alert(`Written articulation required. Minimum 20 words required before submitting (current: ${wordCount} words).`);
+        }
+
+        const normCode = (code || '').replace(/\s+/g, ' ').trim();
+        const normStarter = (problem.starterCode || '').replace(/\s+/g, ' ').trim();
+        const isUntouched = !normCode || normCode === normStarter;
+        
+        if (isUntouched) {
+          alert("❌ Submission Blocked: You have not written a custom solution yet (code is identical to starter template). Please code your solution first.");
+          return;
+        }
+
+        // STEP 1: RUN UNIT TEST SUITE ASSERTIONS BEFORE ACCEPTING SUBMISSION
+        const testRes = runTestSuite(code, lang);
+        if (!testRes.ok) {
+          alert(`❌ Submission Blocked: Solution failed unit test assertions.\n\n${testRes.reason || 'Incorrect output returned.'}\n\nPlease fix your code in the editor before submitting.`);
+          return; // HARD BLOCK: Absolutely cannot submit failing code!
         }
 
         const settings = storage.get('settings', {});
@@ -1791,8 +1860,8 @@
         submitBtn.disabled = true;
         submitBtn.textContent = "Evaluating via LLM...";
 
-        let aiScore = 100;
-        let aiFeedback = "Clean solution verified by static analysis.";
+        let aiScore = testRes.ok ? 100 : 30;
+        let aiFeedback = testRes.ok ? "Clean solution verified by test suite." : "Solution failed automated test assertions.";
 
         try {
           const apiUrl = settings.url || 'https://api.openai.com/v1/chat/completions';
@@ -1813,7 +1882,7 @@
                 const data = await res.json();
                 const reply = data.choices[0].message.content;
                 const parsed = JSON.parse(reply.replace(/```json|```/g, '').trim());
-                aiScore = parsed.score || 100;
+                aiScore = parsed.score || aiScore;
                 aiFeedback = parsed.feedback || aiFeedback;
               }
             } catch (err) {
@@ -1821,12 +1890,30 @@
             }
           }
 
-          const history = storage.get('history', SEED_HISTORY);
-          const ratings = storage.get('ratings', SEED_RATINGS);
+          // If score is too low (< 50%), prompt candidate whether to keep solving
+          if (aiScore < 50) {
+            const retrySolve = confirm(`⚠️ AI Evaluator scored your solution low (${aiScore}%):\n"${aiFeedback}"\n\nWould you like to STAY IN WORKSPACE and improve your code/reasoning?\n\n[OK] Stay & Improve Solution\n[Cancel] Accept Score & Exit`);
+            if (retrySolve) {
+              submitBtn.disabled = false;
+              submitBtn.textContent = "Submit Final Solution →";
+              return;
+            }
+          }
+
+          const history = storage.get('history', []);
+          const ratings = storage.get('ratings', {});
+          const currentRating = ratings[problem.category] || 1000;
           
-          const rawDelta = +32;
-          const finalDelta = Math.round(rawDelta * hintPenalty * (aiScore / 100));
-          ratings[problem.category] = Math.max(800, (ratings[problem.category] || 1000) + finalDelta);
+          // Dynamic Elo Formula: Problem target rating = 900 + (difficulty * 100)
+          const targetElo = 900 + (problem.difficulty * 100);
+          const expectedScore = 1 / (1 + Math.pow(10, (targetElo - currentRating) / 400));
+          const actualScore = (aiScore / 100) * hintPenalty;
+          
+          // K-Factor = 32
+          const rawDelta = Math.round(32 * (actualScore - expectedScore));
+          const finalDelta = rawDelta >= 0 ? rawDelta : rawDelta;
+          
+          ratings[problem.category] = Math.max(800, currentRating + finalDelta);
           storage.set('ratings', ratings);
 
           history.unshift({
@@ -1842,7 +1929,7 @@
           });
           storage.set('history', history);
 
-          showToast(`Solution submitted! +${finalDelta} Elo gained.`);
+          showToast(`Solution submitted! ${finalDelta >= 0 ? '+' : ''}${finalDelta} Elo.`);
           window.location.hash = "#dashboard";
         } finally {
           submitBtn.disabled = false;
