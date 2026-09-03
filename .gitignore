@@ -1,0 +1,6 @@
+# Environment & Local Storage Data
+.env
+.env.local
+*.log
+.DS_Store
+Thumbs.db
