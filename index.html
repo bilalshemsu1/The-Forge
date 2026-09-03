@@ -1716,7 +1716,8 @@
           } catch (err) {
             statusTag.textContent = "✖ Connection Error";
             statusTag.style.color = "var(--signal-fail)";
-            consoleText.innerHTML = `[NETWORK ERROR]: ${err.message}\nFalling back to local Socratic guidance...\n\n[LOCAL SOCRATIC NUDGE]:\n${problem.hints[0] || 'Consider loop invariants and target constraints.'}`;
+            const corsHelp = (apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1')) ? '\n(If testing Ollama/LocalAI locally, ensure CORS headers are enabled or use an OpenAI-compatible cloud key).' : '';
+            consoleText.innerHTML = `[NETWORK ERROR]: ${err.message}${corsHelp}\nFalling back to local Socratic guidance...\n\n[LOCAL SOCRATIC NUDGE]:\n${problem.hints[0] || 'Consider loop invariants and target constraints.'}`;
             return;
           }
         }
