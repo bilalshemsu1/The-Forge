@@ -1,38 +1,68 @@
-# THE FORGE — Engineering Problem-Solving Simulator ⚡
+# THE FORGE — Engineering Problem-Solving & Critical Thinking Simulator ⚡
 
-**THE FORGE** is an open-source, deliberate-practice engineering simulator designed for developers, competitive programmers, and software engineers to practice system design, algorithms, debugging, reverse engineering, and competitive programming.
+> **"In the era of Generative AI, outsourcing your thinking creates initial productivity gains—but slowly erodes your core problem-solving ability, critical analysis, and architectural decision-making. THE FORGE is built to solve this."**
 
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 ![Architecture](https://img.shields.io/badge/architecture-Zero--Build--Single--File-brightgreen.svg)
-![Problems](https://img.shields.io/badge/problems-76--Active--Challenges-blue.svg)
+![Problems](https://img.shields.io/badge/problems-106--Active--Challenges-blue.svg)
+![Languages](https://img.shields.io/badge/languages-Python_3.11_%7C_Go_%7C_PHP_%7C_JS-ember.svg)
 
 ---
 
-## 🌟 Key Features
+## 🎯 The Philosophy & Core Mission
 
-- **76 High-Caliber Engineering Problems**:
-  - **Competitive Programming** (Levels 7–8: Heavy-Light Decomposition, Convex Hull Trick, FFT, Suffix Automaton, Min-Cost Max-Flow, Dominator Trees).
-  - **Beginner to Intermediate Algorithms** (Levels 1–4: Sliding Window, Two Pointers, Dynamic Programming, Binary Search, Stacks, Matrices).
-  - **System Design & Architecture** (Distributed LLM Gateways, Rate Limiters, Consistent Hashing, RBAC Bitmasks).
-  - **Debugging & Reverse Engineering** (Concurrency Race Conditions, Webhook Deadlocks, Binary Protocols).
+In today’s AI-dominated landscape, developers increasingly rely on AI to generate immediate code snippets. While this feels fast and productive in the short term, over time it quietly drains a programmer's most critical assets:
+- **Logical Reasoning & Deep Analytical Thinking**
+- **Independent Problem Investigation & Digging**
+- **Uncompromising Invariant & Edge Case Analysis**
+- **Confident Architecture & Algorithmic Decision-Making**
 
-- **In-Browser Execution Console & Monaco Editor**:
-  - Monaco Editor CDN with `vs-dark` theme, language switching (Python 3.11 & JavaScript ES6), document formatting, and real-time execution console.
-
-- **Live AI Sparring & Tutoring**:
-  - **`✨ AI Hint`**: Real-time Socratic guidance directly inside the workspace without revealing the code solution.
-  - **`💡 AI Simplify Spec`**: Beginner-friendly ELI5 breakdown of complex academic or algorithmic problems.
-  - **AI Solution Grading**: Automatic LLM scoring (`0-100%`) evaluating your code and Reasoning Journal.
-
-- **Responsive Mobile & Desktop System**:
-  - Full desktop layout with sidebar rail.
-  - Mobile bottom navigation dock (`< 950px`) with touch feedback and clean single-word tabs.
+**THE FORGE** is an open-source, deliberate-practice engineering simulator designed to reclaim your technical mastery. By transforming real-world software engineering challenges, system design bottlenecks, and competitive programming puzzles into an engaging, gamified simulator, **THE FORGE forces you to think, dig, and conquer problems on your own.**
 
 ---
 
-## 🚀 Quick Start
+## 🏆 How THE FORGE Gamifies Real Engineering
 
-No build steps or `npm install` required! Simply clone and open `index.html` in any modern web browser or serve static files:
+Instead of superficial trivias, **THE FORGE** challenges you with authentic software engineering problems across **5 core skill domains**:
+
+1. **Algorithms**: Array bounds, sliding windows, dynamic programming, binary search, segment trees, and HLD.
+2. **System Design**: High-throughput distributed rate limiters, token buckets, consistent hashing, and LLM routers.
+3. **Debugging**: Resolving TOCTOU race conditions, multi-threaded mutex deadlocks, and memory leaks.
+4. **Reverse Engineering**: Parsing custom binary wire protocols, decoding bitmask permissions, and byte-stream analysis.
+5. **Read & Reconstruct**: Reading multi-file technical RFC specifications and implementing strict matching software contracts.
+
+### 🎮 The Elo Rating System
+- Start with a baseline score of **1000 Elo** across all 5 skill domains.
+- Solve harder problems (Levels 1–8) to gain **+ Elo Points**.
+- **Reasoning Journal Mandate**: Every submission requires a minimum 20-word written articulation of your strategy, invariants, and failure modes.
+- **Hint Penalties**: Unlock Tier 1 Hints (-20% score cap) or Tier 2 Hints (-40% score cap) if you get stuck.
+- **Strict Verification Gatekeeper**: Untouched starter code and failing test assertions are **hard-blocked** from submission.
+
+---
+
+## 💻 Multi-Language Support (Solve in Your Native Language)
+
+Focus on pure problem-solving without language barriers. Every problem supports:
+- 🐍 **Python 3.11** *(Default)*
+- 🐹 **Go 1.22**
+- 🐘 **PHP 8.3**
+- 🟨 **JavaScript (Node.js ES6+)**
+
+Simply switch the language in the editor toolbar, and **THE FORGE** generates idiomatic starter code and executes verification checks automatically!
+
+---
+
+## 💡 AI Integration: Sparring Partner, Not a Crutch
+
+Unlike tools that hand you the code, AI in **THE FORGE** acts strictly as an **evaluator and sparring partner**:
+- **`💡 AI Simplify Spec`**: Translates complex academic or mathematical prompts into plain-English ELI5 breakdowns.
+- **AI Solution Evaluator**: Grades your code and written **Reasoning Journal** together (`0–100%`) upon final submission.
+
+---
+
+## 🚀 Quick Start (Zero Build Required)
+
+No build steps or `npm install` required! Simply clone and open `index.html` in any modern web browser:
 
 ```bash
 # Clone the repository
@@ -49,18 +79,6 @@ Open `http://localhost:8000` in your web browser.
 
 ---
 
-## 🛠️ Configuration (Optional LLM Integration)
-
-To connect **THE FORGE** to live AI models (OpenAI, Groq, Ollama, etc.):
-1. Click **Settings** (`#settings`) in the sidebar/navigation bar.
-2. Enter your OpenAI-compatible API endpoint URL (e.g. `https://api.openai.com/v1/chat/completions`).
-3. Enter your API Key and Model Identifier (e.g. `gpt-4o`).
-4. Click **Save Config**.
-
-*(Note: In Local Mode without an API key, fallback intelligent Socratic guidance is provided automatically).*
-
----
-
 ## 📄 License
 
-Distributed under the MIT License. See `LICENSE` for more information.
+Distributed under the MIT License. Built with passion for engineers who love to solve hard problems.
