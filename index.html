@@ -1638,9 +1638,10 @@
         box.innerHTML = `<i data-lucide="loader" style="animation:spin 1s linear infinite; width:14px;"></i> <strong style="color:var(--accent-ember);">AI Simplifying...</strong> Explaining concept in plain beginner terms...`;
         lucide.createIcons();
 
-        if (settings.url && settings.apiKey) {
+        const apiUrl = settings.url || 'https://api.openai.com/v1/chat/completions';
+        if (settings.apiKey) {
           try {
-            const res = await fetch(settings.url, {
+            const res = await fetch(apiUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${settings.apiKey}` },
               body: JSON.stringify({
@@ -1685,9 +1686,10 @@
         statusTag.style.color = "var(--accent-ember)";
         consoleText.innerHTML = `[AI TUTOR]: Analyzing code structure and strategy...`;
 
-        if (settings.url && settings.apiKey) {
+        const apiUrl = settings.url || 'https://api.openai.com/v1/chat/completions';
+        if (settings.apiKey) {
           try {
-            const res = await fetch(settings.url, {
+            const res = await fetch(apiUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${settings.apiKey}` },
               body: JSON.stringify({
@@ -1792,10 +1794,10 @@
         let aiFeedback = "Clean solution verified by static analysis.";
 
         try {
-          // Optional OpenAI-compatible LLM endpoint evaluation if configured
-          if (settings.url && settings.apiKey) {
+          const apiUrl = settings.url || 'https://api.openai.com/v1/chat/completions';
+          if (settings.apiKey) {
             try {
-              const res = await fetch(settings.url, {
+              const res = await fetch(apiUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${settings.apiKey}` },
                 body: JSON.stringify({
