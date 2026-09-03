@@ -1588,7 +1588,6 @@
                 </select>
               </div>
               <div class="editor-toolbar-group">
-                <button id="btn-ai-hint" class="btn btn-ember btn-sm"><i data-lucide="sparkles"></i> AI Hint</button>
                 <button id="btn-format-code" class="btn btn-outline btn-sm"><i data-lucide="align-left"></i> Format</button>
                 <button id="btn-run-code" class="btn btn-secondary btn-sm"><i data-lucide="play"></i> Run Code</button>
               </div>
@@ -1702,61 +1701,6 @@
             <span style="font-size:0.75rem; color:var(--text-dim); display:block; margin-top:0.4rem;">(Tip: Add an API Key in Settings for custom live LLM breakdowns)</span>
           `;
         }, 400);
-      });
-
-      // INTERACTIVE AI SOCRATIC HINT & CODE REVIEW ASSISTANT
-      document.getElementById('btn-ai-hint')?.addEventListener('click', async () => {
-        const consoleText = document.getElementById('console-output-text');
-        const statusTag = document.getElementById('console-status-tag');
-        const code = monacoInstance ? monacoInstance.getValue() : '';
-        const settings = storage.get('settings', {});
-
-        statusTag.textContent = "AI Sparring...";
-        statusTag.style.color = "var(--accent-ember)";
-        consoleText.innerHTML = `[AI TUTOR]: Analyzing code structure and strategy...`;
-
-        const apiUrl = settings.url || 'https://api.openai.com/v1/chat/completions';
-        if (settings.apiKey) {
-          try {
-            const res = await fetch(apiUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${settings.apiKey}` },
-              body: JSON.stringify({
-                model: settings.model || 'gpt-4o',
-                messages: [
-                  { role: "system", content: "You are a Socratic AI Engineering Tutor. Do NOT write the code solution for the user. Give a 2-3 sentence Socratic guidance nudge focusing on invariants, edge cases, or complexity bounds." },
-                  { role: "user", content: `Problem: ${problem.title}\nPrompt: ${problem.prompt}\nUser Code:\n${code}` }
-                ]
-              })
-            });
-            if (res.ok) {
-              const data = await res.json();
-              const reply = data.choices[0].message.content;
-              statusTag.textContent = "✓ Live AI Response";
-              statusTag.style.color = "var(--signal-pass)";
-              consoleText.innerHTML = `[LIVE LLM SOCRATIC NUDGE (${settings.model || 'gpt-4o'})]:\n${reply}`;
-              return;
-            } else {
-              statusTag.textContent = `✖ API Error ${res.status}`;
-              statusTag.style.color = "var(--signal-fail)";
-              consoleText.innerHTML = `[API ERROR ${res.status}]: ${res.statusText}\nFalling back to local Socratic guidance...\n\n[LOCAL SOCRATIC NUDGE]:\n${problem.hints[0] || 'Consider loop invariants and target constraints.'}`;
-              return;
-            }
-          } catch (err) {
-            statusTag.textContent = "✖ Connection Error";
-            statusTag.style.color = "var(--signal-fail)";
-            const corsHelp = (apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1')) ? '\n(If testing Ollama/LocalAI locally, ensure CORS headers are enabled or use an OpenAI-compatible cloud key).' : '';
-            consoleText.innerHTML = `[NETWORK ERROR]: ${err.message}${corsHelp}\nFalling back to local Socratic guidance...\n\n[LOCAL SOCRATIC NUDGE]:\n${problem.hints[0] || 'Consider loop invariants and target constraints.'}`;
-            return;
-          }
-        }
-
-        // Local Socratic Nudge when no user API Key configured in Settings
-        setTimeout(() => {
-          statusTag.textContent = "ℹ Local Mode (No API Key)";
-          statusTag.style.color = "var(--text-dim)";
-          consoleText.innerHTML = `[LOCAL SOCRATIC HINT]:\n${problem.hints[0] || 'Consider the relationship between your loop invariants and target data constraints.'}\n\n💡 Tip: Add your OpenAI API Key in Settings to get real-time Live AI response!`;
-        }, 300);
       });
       document.getElementById('btn-hint-1')?.addEventListener('click', () => {
         hintPenalty = Math.min(hintPenalty, 0.8);
