@@ -764,7 +764,7 @@ export const problemBank = {
     return list;
   },
 
-  getSuggestedProblem(ratings) {
+  getSuggestedProblem(ratings = {}) {
     const all = this.getAllProblems();
     const history = storage.get('attempt_history', []);
     const solvedIds = new Set(history.filter(h => h.solved).map(h => h.problemId));

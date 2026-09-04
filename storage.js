@@ -6,9 +6,25 @@ const PREFIX = 'forge_';
 
 export const storage = {
   get(key, defaultValue = null) {
+    const keyAliases = {
+      'llm_settings': ['llm_settings', 'settings'],
+      'settings': ['settings', 'llm_settings'],
+      'skill_ratings': ['skill_ratings', 'ratings'],
+      'ratings': ['ratings', 'skill_ratings'],
+      'attempt_history': ['attempt_history', 'history'],
+      'history': ['history', 'attempt_history'],
+      'custom_problems': ['custom_problems', 'problems'],
+      'problems': ['problems', 'custom_problems']
+    };
+    const candidates = keyAliases[key] || [key];
     try {
-      const item = localStorage.getItem(PREFIX + key);
-      return item ? JSON.parse(item) : defaultValue;
+      for (const k of candidates) {
+        const item = localStorage.getItem(PREFIX + k);
+        if (item !== null && item !== undefined) {
+          return JSON.parse(item);
+        }
+      }
+      return defaultValue;
     } catch (err) {
       console.error(`Storage get error for key "${key}":`, err);
       return defaultValue;

@@ -8,8 +8,8 @@ export const CATEGORIES = [
   'read-and-reconstruct'
 ];
 
-const DEFAULT_RATING = 1000;
-const K_FACTOR = 32;
+export const DEFAULT_RATING = 1000;
+export const K_FACTOR = 32;
 
 export const skillRating = {
   getRatings() {

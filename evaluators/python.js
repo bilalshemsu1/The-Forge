@@ -49,11 +49,14 @@ export async function evaluatePython(code, tests = []) {
     const results = [];
     let allPassed = true;
 
+    pyodide.globals.set('__user_code', code);
+
     const pyHarness = `
 import json
 import sys
+import re
 
-${code}
+exec(__user_code, globals())
 
 def __exec_test(input_str, starter_code):
     try:
@@ -61,7 +64,6 @@ def __exec_test(input_str, starter_code):
     except Exception:
         val = input_str
 
-    # Discover candidate function dynamically
     fn = None
     if 'solution' in globals():
         fn = globals()['solution']
@@ -70,21 +72,27 @@ def __exec_test(input_str, starter_code):
     elif 'solve' in globals():
         fn = globals()['solve']
     else:
-        # Check matching function from def in user code
-        import re
-        matches = re.findall(r'def\\s+([a-zA-Z0-9_]+)\\s*\\(', """${code.replace(/\\/g, '\\\\').replace(/`/g, '\\`')}""")
+        matches = re.findall(r'def\\s+([a-zA-Z0-9_]+)\\s*\\(', __user_code)
         for m in matches:
             if m not in ('__exec_test', '__run_test'):
-                fn = globals()[m]
-                break
+                fn = globals().get(m)
+                if fn:
+                    break
 
     if fn is None:
         raise Exception("No candidate function found in python script.")
 
+    res = None
     if isinstance(val, dict):
-        res = fn(**val)
+        try:
+            res = fn(**val)
+        except TypeError:
+            res = fn(val)
     elif isinstance(val, list):
-        res = fn(*val)
+        try:
+            res = fn(*val)
+        except TypeError:
+            res = fn(val)
     else:
         res = fn(val)
 

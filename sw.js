@@ -9,6 +9,8 @@ const ASSETS_TO_CACHE = [
   './skillRating.js',
   './ai.js',
   './manifest.json',
+  './logo.png',
+  './icon-192.png',
   './evaluators/javascript.js',
   './evaluators/python.js',
   './screens/dashboard.js',

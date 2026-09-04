@@ -1,5 +1,5 @@
 import { problemBank } from '../problemBank.js';
-import { skillRating, CATEGORIES } from '../skillRating.js';
+import { skillRating, CATEGORIES, DEFAULT_RATING } from '../skillRating.js';
 import { storage } from '../storage.js';
 
 export function renderProblemPicker(container, router) {

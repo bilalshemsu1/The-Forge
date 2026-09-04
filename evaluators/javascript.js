@@ -20,7 +20,21 @@ export async function evaluateJavaScript(code, tests = []) {
       let allPassed = true;
 
       try {
-        const userFn = new Function('input', code + '\\n\\nif (typeof solution === "function") return solution(input); if (typeof run === "function") return run(input); if (typeof solve === "function") return solve(input);');
+        const getRunner = new Function(code + '\\n\\n' +
+          'if (typeof solution === "function") return solution; ' +
+          'if (typeof run === "function") return run; ' +
+          'if (typeof solve === "function") return solve; ' +
+          'const matches = [...code.matchAll(/(?:function|class|const|let|var)\\s+([a-zA-Z0-9_]+)/g)].map(m => m[1]); ' +
+          'for (const m of matches) { ' +
+          '  try { if (typeof eval(m) === "function") return eval(m); } catch(_) {} ' +
+          '} ' +
+          'return null;'
+        );
+
+        const targetFn = getRunner();
+        if (!targetFn) {
+          throw new Error("No runnable solution function found in submitted code.");
+        }
         
         for (let i = 0; i < tests.length; i++) {
           const test = tests[i];
@@ -35,7 +49,22 @@ export async function evaluateJavaScript(code, tests = []) {
           let error = null;
 
           try {
-            output = userFn(parsedInput);
+            if (typeof parsedInput === 'object' && parsedInput !== null && !Array.isArray(parsedInput)) {
+              try {
+                output = targetFn(...Object.values(parsedInput));
+              } catch (_) {
+                output = targetFn(parsedInput);
+              }
+            } else if (Array.isArray(parsedInput)) {
+              try {
+                output = targetFn(...parsedInput);
+              } catch (_) {
+                output = targetFn(parsedInput);
+              }
+            } else {
+              output = targetFn(parsedInput);
+            }
+
             const strOutput = typeof output === 'object' ? JSON.stringify(output) : String(output);
             const strExpected = typeof expected === 'object' ? JSON.stringify(expected) : String(expected);
             passed = strOutput === strExpected || String(output).trim() === String(test.expectedOutput).trim();
@@ -49,7 +78,7 @@ export async function evaluateJavaScript(code, tests = []) {
             index: i + 1,
             input: test.input,
             expected: test.expectedOutput,
-            actual: error ? 'Error: ' + error : String(output),
+            actual: error ? 'Error: ' + error : (typeof output === 'object' ? JSON.stringify(output) : String(output)),
             passed
           });
         }
