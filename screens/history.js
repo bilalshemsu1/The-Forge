@@ -34,8 +34,8 @@ export function renderHistory(container, router) {
             <span class="status-indicator ${item.solved ? 'pass' : 'fail'}">
               ${item.solved ? '✓ SOLVED' : (item.isSkip ? '⏭️ SKIPPED' : '❌ FAILED')}
             </span>
-            <h3>${item.problemTitle}</h3>
-            <span class="category-badge cat-${item.category}">${item.category}</span>
+            <h3>${escapeHtml(item.problemTitle)}</h3>
+            <span class="category-badge cat-${escapeHtml(item.category)}">${escapeHtml(item.category)}</span>
           </div>
           <div class="header-right">
             <span class="delta-tag ${item.ratingDelta >= 0 ? 'pos' : 'neg'}">
@@ -66,13 +66,13 @@ export function renderHistory(container, router) {
 
         <div class="history-reasoning">
           <strong>Reasoning Journal:</strong>
-          <p class="quote">"${item.userReasoning || 'N/A'}"</p>
+          <p class="quote">"${escapeHtml(item.userReasoning || 'N/A')}"</p>
         </div>
 
         ${item.retroNote ? `
           <div class="history-retro">
             <strong>Retrospective Note:</strong>
-            <p class="retro-quote">💡 "${item.retroNote}"</p>
+            <p class="retro-quote">💡 "${escapeHtml(item.retroNote)}"</p>
           </div>
         ` : ''}
       </div>
@@ -82,13 +82,13 @@ export function renderHistory(container, router) {
   container.innerHTML = `
     <div class="history-screen">
       <div class="history-header card">
-        <h2>Practice History & Progress Timeline</h2>
-        <p class="subtitle">Review past problem attempts, time metrics, and retrospective notes.</p>
+        <h2>Attempt History & Performance Log</h2>
+        <p class="subtitle">Complete audit trail of all practice sessions, reasoning journals, and rating updates.</p>
 
         <div class="filters-row">
           <div class="filter-group">
-            <label for="hist-category">Category</label>
-            <select id="hist-category" class="input-select">
+            <label for="filter-history-category">Category</label>
+            <select id="filter-history-category" class="input-select">
               <option value="all">All Categories</option>
               <option value="system-design">System Design</option>
               <option value="debugging">Debugging</option>
@@ -99,29 +99,34 @@ export function renderHistory(container, router) {
           </div>
 
           <div class="filter-group">
-            <label for="hist-outcome">Outcome</label>
-            <select id="hist-outcome" class="input-select">
+            <label for="filter-history-outcome">Outcome</label>
+            <select id="filter-history-outcome" class="input-select">
               <option value="all">All Outcomes</option>
               <option value="solved">Solved Only</option>
-              <option value="failed">Failed / Skipped Only</option>
+              <option value="failed">Failed / Skipped</option>
             </select>
           </div>
         </div>
       </div>
 
-      <div id="history-list-container" class="history-feed"></div>
+      <div id="history-list-container" class="history-grid"></div>
     </div>
   `;
 
-  document.getElementById('hist-category').addEventListener('change', (e) => {
+  document.getElementById('filter-history-category').addEventListener('change', (e) => {
     categoryFilter = e.target.value;
     renderHistoryList();
   });
 
-  document.getElementById('hist-outcome').addEventListener('change', (e) => {
+  document.getElementById('filter-history-outcome').addEventListener('change', (e) => {
     outcomeFilter = e.target.value;
     renderHistoryList();
   });
 
   renderHistoryList();
+}
+
+function escapeHtml(str) {
+  if (typeof str !== 'string') return String(str);
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }

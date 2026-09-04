@@ -11,11 +11,17 @@ export function renderProblemView(container, router, params) {
   const problemId = params?.id;
   const problem = problemBank.getProblemById(problemId);
 
+  // Clean up existing monaco instance disposable if re-entering
+  if (monacoEditorInstance && typeof monacoEditorInstance.dispose === 'function') {
+    try { monacoEditorInstance.dispose(); } catch (_) {}
+    monacoEditorInstance = null;
+  }
+
   if (!problem) {
     container.innerHTML = `
       <div class="empty-state card">
         <h2>Problem Not Found</h2>
-        <p>The requested problem ID "${problemId}" does not exist in the bank.</p>
+        <p>The requested problem ID "${escapeHtml(problemId)}" does not exist in the bank.</p>
         <button id="btn-back-picker" class="btn btn-primary">Return to Problem Bank</button>
       </div>
     `;
@@ -27,7 +33,7 @@ export function renderProblemView(container, router, params) {
   let hintsUnlocked = 0;
   const unlockedHintTexts = {};
   let isSubmitting = false;
-  let activeRightTab = 'editor'; // 'editor' | 'test-output' | 'ai-sparring'
+  let activeRightTab = 'editor';
 
   if (timerInterval) clearInterval(timerInterval);
 
@@ -37,8 +43,8 @@ export function renderProblemView(container, router, params) {
       <div class="workspace-header card">
         <div class="header-left">
           <button id="btn-back" class="btn btn-secondary btn-sm">← Bank</button>
-          <span class="category-badge cat-${problem.category}">${problem.category}</span>
-          <h2 class="problem-title-text">${problem.title}</h2>
+          <span class="category-badge cat-${escapeHtml(problem.category)}">${escapeHtml(problem.category)}</span>
+          <h2 class="problem-title-text">${escapeHtml(problem.title)}</h2>
         </div>
         <div class="header-right">
           <div class="timer-box">
@@ -46,7 +52,7 @@ export function renderProblemView(container, router, params) {
             <span id="timer-display" class="timer-text">00:00</span>
           </div>
           <span class="meta-badge">Diff: ${problem.difficulty}/10</span>
-          <span class="meta-badge">Eval: ${problem.evalMode}</span>
+          <span class="meta-badge">Eval: ${escapeHtml(problem.evalMode)}</span>
         </div>
       </div>
 
@@ -59,153 +65,130 @@ export function renderProblemView(container, router, params) {
             <button class="panel-tab" data-tab="hints">Hint Ladder (${hintsUnlocked}/3)</button>
           </div>
 
-          <!-- Tab Content: Prompt -->
-          <div id="tab-prompt-content" class="tab-pane active">
-            <div class="panel-body markdown-body">
+          <div id="tab-prompt-content" class="panel-body tab-content">
+            <div class="prompt-markdown">
               ${window.marked ? window.marked.parse(problem.prompt) : formatMarkdownFallback(problem.prompt)}
+            </div>
+
+            <div class="spec-details-box">
+              <h4>Technical Constraints & I/O Contract</h4>
+              <ul>
+                ${problem.details?.constraints ? `<li><strong>Constraints:</strong> <br/>${formatMarkdownFallback(problem.details.constraints)}</li>` : ''}
+                ${problem.details?.inputFormat ? `<li><strong>Input Format:</strong> <code>${escapeHtml(problem.details.inputFormat)}</code></li>` : ''}
+                ${problem.details?.outputFormat ? `<li><strong>Output Format:</strong> <code>${escapeHtml(problem.details.outputFormat)}</code></li>` : ''}
+              </ul>
+              
+              ${problem.details?.sampleInput ? `
+                <div class="sample-io">
+                  <div><strong>Sample Input:</strong><pre><code>${escapeHtml(problem.details.sampleInput)}</code></pre></div>
+                  <div><strong>Sample Output:</strong><pre><code>${escapeHtml(problem.details.sampleOutput)}</code></pre></div>
+                </div>
+              ` : ''}
             </div>
           </div>
 
-          <!-- Tab Content: Hints -->
-          <div id="tab-hints-content" class="tab-pane">
-            <div class="hint-ladder-section">
-              <h4>Hint Ladder (Rating Penalty Applied)</h4>
-              <p class="hint-disclaimer">Unlocking hints incurs a permanent score penalty for this attempt. Tier 3 discloses full algorithm explanation.</p>
+          <div id="tab-hints-content" class="panel-body tab-content" style="display:none;">
+            <div class="hint-ladder">
+              <p class="hint-policy-note">⚠️ Unlocking hints reduces maximum Elo reward for this attempt.</p>
 
-              <div class="hint-tiers">
-                <!-- Tier 1 -->
-                <div class="hint-card ${hintsUnlocked >= 1 ? 'unlocked' : 'locked'}" id="hint-tier-1">
-                  <div class="hint-header">
-                    <span class="tier-label">Tier 1: Socratic Nudge (-20% Score)</span>
-                    <button class="btn btn-sm btn-outline btn-unlock-hint" data-tier="1" ${hintsUnlocked >= 1 ? 'disabled' : ''}>
-                      ${hintsUnlocked >= 1 ? 'Unlocked' : 'Unlock Tier 1 (-20%)'}
-                    </button>
-                  </div>
-                  <div class="hint-content" id="hint-content-1">
-                    ${hintsUnlocked >= 1 ? (unlockedHintTexts[1] || problem.hints[0] || 'Nudge unlocked.') : '🔒 Locked. Click to reveal redirecting question.'}
-                  </div>
+              <!-- Hint Tier 1 -->
+              <div class="hint-card locked" id="hint-tier-1">
+                <div class="hint-header">
+                  <span>Tier 1: Socratic Guidance (-20% Elo)</span>
+                  <button class="btn btn-warning btn-sm btn-unlock-hint" data-tier="1">Unlock Tier 1</button>
                 </div>
-
-                <!-- Tier 2 -->
-                <div class="hint-card ${hintsUnlocked >= 2 ? 'unlocked' : 'locked'}" id="hint-tier-2">
-                  <div class="hint-header">
-                    <span class="tier-label">Tier 2: Core Concept (-40% Score)</span>
-                    <button class="btn btn-sm btn-outline btn-unlock-hint" data-tier="2" ${hintsUnlocked < 1 || hintsUnlocked >= 2 ? 'disabled' : ''}>
-                      ${hintsUnlocked >= 2 ? 'Unlocked' : 'Unlock Tier 2 (-40%)'}
-                    </button>
-                  </div>
-                  <div class="hint-content" id="hint-content-2">
-                    ${hintsUnlocked >= 2 ? (unlockedHintTexts[2] || problem.hints[1] || 'Concept unlocked.') : '🔒 Locked. Requires Tier 1 unlock first.'}
-                  </div>
+                <div class="hint-body" id="hint-content-1">
+                  <em>Locked. Click unlock to view conceptual guidance.</em>
                 </div>
+              </div>
 
-                <!-- Tier 3 -->
-                <div class="hint-card ${hintsUnlocked >= 3 ? 'unlocked' : 'locked'}" id="hint-tier-3">
-                  <div class="hint-header">
-                    <span class="tier-label">Tier 3: Full Approach (-70% Score)</span>
-                    <button class="btn btn-sm btn-outline btn-unlock-hint" data-tier="3" ${hintsUnlocked < 2 || hintsUnlocked >= 3 ? 'disabled' : ''}>
-                      ${hintsUnlocked >= 3 ? 'Unlocked' : 'Unlock Tier 3 (-70%)'}
-                    </button>
-                  </div>
-                  <div class="hint-content" id="hint-content-3">
-                    ${hintsUnlocked >= 3 ? (unlockedHintTexts[3] || problem.hints[2] || 'Explanation unlocked.') : '🔒 Locked. Requires Tier 2 unlock first.'}
-                  </div>
+              <!-- Hint Tier 2 -->
+              <div class="hint-card locked" id="hint-tier-2">
+                <div class="hint-header">
+                  <span>Tier 2: Pseudocode & Invariants (-40% Elo)</span>
+                  <button class="btn btn-warning btn-sm btn-unlock-hint" data-tier="2" disabled>Unlock Tier 2</button>
+                </div>
+                <div class="hint-body" id="hint-content-2">
+                  <em>Locked. Requires Tier 1 unlock first.</em>
+                </div>
+              </div>
+
+              <!-- Hint Tier 3 -->
+              <div class="hint-card locked" id="hint-tier-3">
+                <div class="hint-header">
+                  <span>Tier 3: Reference Implementation (-70% Elo)</span>
+                  <button class="btn btn-warning btn-sm btn-unlock-hint" data-tier="3" disabled>Unlock Tier 3</button>
+                </div>
+                <div class="hint-body" id="hint-content-3">
+                  <em>Locked. Requires Tier 2 unlock first.</em>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Right Pane: Code Editor, Test Console & AI Sparring -->
+        <!-- Right Pane: Code Editor & Execution Workstation -->
         <div class="panel editor-panel card">
           <div class="panel-tab-bar">
-            <button class="panel-tab active" id="tab-btn-editor" data-right-tab="editor">💻 Code Workspace</button>
-            <button class="panel-tab" id="tab-btn-test" data-right-tab="test-output">🧪 Test Runner Console</button>
-            <button class="panel-tab highlight-ai" id="tab-btn-ai" data-right-tab="ai-sparring">💬 AI Sparring Partner</button>
+            <button class="panel-tab active" data-right-tab="editor">Code Solution</button>
+            <button class="panel-tab" data-right-tab="test-output">Console Output</button>
+            <button class="panel-tab" data-right-tab="ai-sparring">AI Sparring Partner</button>
           </div>
 
-          <!-- Right Pane Tab: Code Editor -->
-          <div id="right-tab-editor" class="tab-pane active">
-            ${problem.language !== 'none' ? `
-              <div id="monaco-container" class="editor-container"></div>
-            ` : `
-              <div class="no-editor-notice">
-                <p>💡 System Design / Open-Ended Problem. Write detailed strategy & tradeoffs in the reasoning journal below.</p>
-              </div>
-            `}
+          <div id="right-tab-editor" class="tab-content">
+            <div class="editor-subbar">
+              <span class="lang-tag">Target: ${escapeHtml(problem.language.toUpperCase())}</span>
+              ${problem.evalMode === 'exact-test' ? `
+                <button id="btn-run-tests-top" class="btn btn-secondary btn-sm">► Run Local Test Assertions</button>
+              ` : ''}
+            </div>
+            <div id="monaco-container" class="monaco-editor-box"></div>
           </div>
 
-          <!-- Right Pane Tab: Test Runner Console -->
-          <div id="right-tab-test-output" class="tab-pane" style="display:none;">
-            <div class="test-console-box">
-              <div class="console-header">
-                <h4>Unit Test Output</h4>
-                <button id="btn-run-tests-console" class="btn btn-secondary btn-sm">► Run Local Unit Tests</button>
-              </div>
-              <div id="test-results-container" class="console-body">
-                <p class="text-dim">No tests run yet. Click "Run Local Unit Tests" to evaluate code before committing.</p>
-              </div>
+          <div id="right-tab-test-output" class="tab-content" style="display:none;">
+            <div class="console-actions">
+              <button id="btn-run-tests-console" class="btn btn-secondary btn-sm">► Re-Run Suite</button>
+            </div>
+            <div id="test-results-container" class="test-results-panel">
+              <div class="info-alert">Click "Run Test Assertions" to execute code against sandboxed unit tests.</div>
             </div>
           </div>
 
-          <!-- Right Pane Tab: AI Sparring Partner -->
-          <div id="right-tab-ai-sparring" class="tab-pane" style="display:none;">
-            <div class="ai-sparring-box">
-              <div class="sparring-header">
-                <h4>AI Sparring Partner & Rubber Duck</h4>
-                <span class="sparring-disclaimer">Zero Elo Penalty • Ask anything about tradeoffs, assumptions, or syntax</span>
-              </div>
-              <div id="sparring-chat-feed" class="sparring-chat">
+          <div id="right-tab-ai-sparring" class="tab-content" style="display:none;">
+            <div class="sparring-box">
+              <div id="sparring-chat-feed" class="sparring-feed">
                 <div class="chat-msg ai-msg">
-                  <strong>AI Partner:</strong> Ask me about edge cases, dynamic programming state transitions, or memory constraints. I won't write your code, but I will help you reason through it cleanly.
+                  <strong>AI Partner:</strong> Ask me about complexity bounds, edge case invariants, or architectural strategies. I will provide Socratic hints without giving away the exact solution.
                 </div>
               </div>
               <div class="sparring-input-bar">
-                <input type="text" id="sparring-input" class="input-text" placeholder="Ask a technical question..." />
+                <input type="text" id="sparring-input" class="input-text" placeholder="Ask your sparring question..." />
                 <button id="btn-send-sparring" class="btn btn-primary btn-sm">Send</button>
               </div>
             </div>
           </div>
 
-          <!-- Mandatory Reasoning Journal Section with AI Assistance -->
-          <div class="journal-section">
+          <!-- Reasoning Journal & Action Bar -->
+          <div class="reasoning-journal-box">
             <div class="journal-header">
-              <label for="reasoning-journal">
-                Mandatory Reasoning Journal
-                <span class="required-star">*</span>
-              </label>
-              <div class="journal-header-right">
-                ${isLLMConfigured() ? `
-                  <button type="button" id="btn-ai-draft-journal" class="btn btn-sm btn-outline btn-ai-action">
-                    ✨ AI Draft Reasoning
-                  </button>
-                ` : ''}
-                <span id="journal-word-count" class="word-count-badge">0 / 20 words min</span>
-              </div>
+              <label for="reasoning-journal"><strong>Reasoning & Strategy Journal</strong> (Required before submission)</label>
+              <button id="btn-ai-draft-journal" class="btn btn-outline btn-sm">✨ AI Draft Reasoning</button>
             </div>
-            <textarea
-              id="reasoning-journal"
-              class="input-textarea journal-textarea"
-              placeholder="Articulate your strategy and tradeoffs before submitting (Minimum 20 words required)..."
-            ></textarea>
-            <div id="journal-warning" class="journal-warning-text">
-              ⚠️ Written articulation required (minimum 20 words) to enable submission.
+            <textarea id="reasoning-journal" class="journal-textarea" placeholder="Explain your design strategy, invariants, complexity bounds, and edge cases (Minimum 20 words required)..."></textarea>
+            <div class="journal-footer">
+              <span id="journal-word-count" class="word-count-badge">0 / 20 words min</span>
+              <span id="journal-warning" class="journal-warning-text">Explain your approach in at least 20 words to enable submission.</span>
             </div>
           </div>
 
-          <!-- Execution Bar -->
-          <div class="action-bar">
-            <div class="action-bar-left">
-              <button id="btn-skip" class="btn btn-danger-outline btn-sm">Give Up / Skip</button>
+          <div class="workspace-action-bar">
+            <button id="btn-skip" class="btn btn-outline btn-sm">Skip Problem (Loss)</button>
+            <div class="action-right">
               ${problem.evalMode === 'exact-test' ? `
-                <button id="btn-run-tests" class="btn btn-secondary">
-                  ► Run Tests
-                </button>
+                <button id="btn-run-tests" class="btn btn-secondary">► Run Tests</button>
               ` : ''}
             </div>
-            <button id="btn-submit" class="btn btn-primary btn-large" disabled>
-              Submit for Review →
-            </button>
+            <button id="btn-submit" class="btn btn-primary btn-large" disabled>Submit for Review →</button>
           </div>
         </div>
       </div>
@@ -226,7 +209,7 @@ export function renderProblemView(container, router, params) {
     initMonacoEditor(problem.starterCode || '', problem.language);
   }
 
-  // Left Pane Tab Switching (Prompt / Hints)
+  // Left Pane Tab Switching
   container.querySelectorAll('.panel-tab[data-tab]').forEach(tab => {
     tab.addEventListener('click', () => {
       container.querySelectorAll('.panel-tab[data-tab]').forEach(t => t.classList.remove('active'));
@@ -238,7 +221,7 @@ export function renderProblemView(container, router, params) {
     });
   });
 
-  // Right Pane Tab Switching (Editor / Test Console / AI Sparring)
+  // Right Pane Tab Switching
   function switchRightTab(tabName) {
     activeRightTab = tabName;
     container.querySelectorAll('.panel-tab[data-right-tab]').forEach(t => {
@@ -313,7 +296,6 @@ export function renderProblemView(container, router, params) {
     const question = sparringInput.value.trim();
     if (!question) return;
 
-    // Append user message
     const userMsgDiv = document.createElement('div');
     userMsgDiv.className = 'chat-msg user-msg';
     userMsgDiv.innerHTML = `<strong>You:</strong> ${escapeHtml(question)}`;
@@ -322,7 +304,6 @@ export function renderProblemView(container, router, params) {
     sparringInput.value = '';
     btnSendSparring.disabled = true;
 
-    // Append thinking indicator
     const thinkingDiv = document.createElement('div');
     thinkingDiv.className = 'chat-msg ai-msg thinking';
     thinkingDiv.innerHTML = `<em>AI Partner is thinking...</em>`;
@@ -344,7 +325,7 @@ export function renderProblemView(container, router, params) {
       thinkingDiv.remove();
       const errDiv = document.createElement('div');
       errDiv.className = 'chat-msg ai-msg error';
-      errDiv.innerHTML = `⚠️ Error: ${err.message}`;
+      errDiv.innerHTML = `⚠️ Error: ${escapeHtml(err.message)}`;
       chatFeed.appendChild(errDiv);
     } finally {
       btnSendSparring.disabled = false;
@@ -377,13 +358,13 @@ export function renderProblemView(container, router, params) {
     }
 
     if (evalOutput.error) {
-      consoleOutput.innerHTML = `<div class="eval-error-box">⚠️ ${evalOutput.error}</div>`;
-      return;
+      consoleOutput.innerHTML = `<div class="eval-error-box">⚠️ ${escapeHtml(evalOutput.error)}</div>`;
+      return evalOutput;
     }
 
     if (!evalOutput.results || evalOutput.results.length === 0) {
-      consoleOutput.innerHTML = `<div class="info-alert">${evalOutput.message || 'All local checks complete.'}</div>`;
-      return;
+      consoleOutput.innerHTML = `<div class="info-alert">${escapeHtml(evalOutput.message || 'All local checks complete.')}</div>`;
+      return evalOutput;
     }
 
     const allPassed = evalOutput.success;
@@ -414,10 +395,14 @@ export function renderProblemView(container, router, params) {
         </tbody>
       </table>
     `;
+    return evalOutput;
   }
 
   const btnRunTests = document.getElementById('btn-run-tests');
   if (btnRunTests) btnRunTests.addEventListener('click', runLocalUnitTests);
+
+  const btnRunTestsTop = document.getElementById('btn-run-tests-top');
+  if (btnRunTestsTop) btnRunTestsTop.addEventListener('click', runLocalUnitTests);
 
   const btnRunConsole = document.getElementById('btn-run-tests-console');
   if (btnRunConsole) btnRunConsole.addEventListener('click', runLocalUnitTests);
@@ -483,10 +468,29 @@ export function renderProblemView(container, router, params) {
     }
   });
 
-  // Final Submit handler
+  // Final Submit handler with Strict Gatekeeping
   submitBtn.addEventListener('click', async () => {
     const userReasoning = journalInput.value.trim();
     if (userReasoning.split(/\s+/).length < 20) return;
+
+    const userCode = monacoEditorInstance ? monacoEditorInstance.getValue() : '';
+
+    // Gate 1: Untouched Starter Code Check against true problem starterCode
+    const normUser = (userCode || '').replace(/\s+/g, ' ').trim();
+    const normStarter = (problem.starterCode || '').replace(/\s+/g, ' ').trim();
+    if (!normUser || normUser === normStarter || normUser.includes('pass') && normUser.length < normStarter.length + 10) {
+      alert('❌ Submission Blocked: You have not written a custom solution yet (code is identical to starter template). Please code your solution first.');
+      return;
+    }
+
+    // Gate 2: Strict Test Assertions Verification for exact-test problems
+    if (problem.evalMode === 'exact-test') {
+      const evalRes = await runLocalUnitTests();
+      if (!evalRes || !evalRes.success) {
+        alert('❌ Submission Blocked: Solution failed unit test assertions. Please fix all failing tests before submitting.');
+        return;
+      }
+    }
 
     isSubmitting = true;
     submitBtn.disabled = true;
@@ -494,21 +498,13 @@ export function renderProblemView(container, router, params) {
 
     clearInterval(timerInterval);
 
-    const userCode = monacoEditorInstance ? monacoEditorInstance.getValue() : '';
-
     let evalOutput = { success: false, results: [] };
     let solved = false;
     let aiQualityScore = null;
 
     try {
       if (problem.evalMode === 'exact-test') {
-        if (problem.language === 'python') {
-          evalOutput = await evaluatePython(userCode, problem.tests);
-        } else if (problem.language === 'javascript') {
-          evalOutput = await evaluateJavaScript(userCode, problem.tests);
-        } else {
-          evalOutput = { success: true, message: 'No automatic evaluator for language.' };
-        }
+        evalOutput = await runLocalUnitTests();
         solved = Boolean(evalOutput.success);
       } else if (problem.evalMode === 'ai-graded') {
         if (isLLMConfigured()) {
@@ -598,7 +594,7 @@ function initMonacoEditor(initialCode, language) {
 
 function escapeHtml(str) {
   if (typeof str !== 'string') return String(str);
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
 function formatMarkdownFallback(text) {
@@ -607,7 +603,7 @@ function formatMarkdownFallback(text) {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/^### (.*$)/gim, '<h3>$1$</h3>')
+    .replace(/^### (.*$)/gim, '<h3>$1</h3>')
     .replace(/^## (.*$)/gim, '<h2>$1</h2>')
     .replace(/^# (.*$)/gim, '<h1>$1</h1>')
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')

@@ -1,10 +1,16 @@
 /**
- * JavaScript Code Evaluator using Web Worker sandbox.
+ * JavaScript Code Evaluator using Web Worker sandbox with 5s timeout killswitch.
  */
 
 export async function evaluateJavaScript(code, tests = []) {
   if (!tests || tests.length === 0) {
-    return { success: true, message: 'No exact test cases defined.', results: [] };
+    try {
+      const fn = new Function('input', code);
+      fn(null);
+      return { success: true, message: 'JavaScript syntax clean.', results: [] };
+    } catch (err) {
+      return { success: false, error: 'JavaScript Execution Error: ' + err.message, results: [] };
+    }
   }
 
   const workerCode = `
@@ -14,8 +20,7 @@ export async function evaluateJavaScript(code, tests = []) {
       let allPassed = true;
 
       try {
-        // Execute user code to define functions/variables
-        const userFn = new Function('input', code + '\\n\\nif (typeof solution === "function") return solution(input); if (typeof run === "function") return run(input);');
+        const userFn = new Function('input', code + '\\n\\nif (typeof solution === "function") return solution(input); if (typeof run === "function") return run(input); if (typeof solve === "function") return solve(input);');
         
         for (let i = 0; i < tests.length; i++) {
           const test = tests[i];
@@ -59,31 +64,24 @@ export async function evaluateJavaScript(code, tests = []) {
   return new Promise((resolve) => {
     const blob = new Blob([workerCode], { type: 'application/javascript' });
     const worker = new Worker(URL.createObjectURL(blob));
-
-    const timeout = setTimeout(() => {
-      worker.terminate();
-      resolve({
-        success: false,
-        error: 'Execution timed out (5s limit exceeded). Possible infinite loop.',
-        results: []
-      });
-    }, 5000);
+    let timeoutId;
 
     worker.onmessage = (e) => {
-      clearTimeout(timeout);
+      clearTimeout(timeoutId);
       worker.terminate();
       resolve(e.data);
     };
 
     worker.onerror = (err) => {
-      clearTimeout(timeout);
+      clearTimeout(timeoutId);
       worker.terminate();
-      resolve({
-        success: false,
-        error: 'Worker runtime error: ' + err.message,
-        results: []
-      });
+      resolve({ success: false, error: 'Worker Error: ' + err.message, results: [] });
     };
+
+    timeoutId = setTimeout(() => {
+      worker.terminate();
+      resolve({ success: false, error: 'Time Limit Exceeded: Code execution timed out (5s limit).', results: [] });
+    }, 5000);
 
     worker.postMessage({ code, tests });
   });

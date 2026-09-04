@@ -6,33 +6,51 @@ import { renderImportProblem } from './screens/importProblem.js';
 import { renderSettings } from './screens/settings.js';
 import { renderHistory } from './screens/history.js';
 import { isLLMConfigured } from './ai.js';
+import { storage } from './storage.js';
+
+export function escapeHtml(str) {
+  if (typeof str !== 'string') return str;
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+export function showToast(message) {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.innerHTML = `<i data-lucide="check-circle-2" style="color:var(--accent-ember);width:16px;"></i> <span>${escapeHtml(message)}</span>`;
+  container.appendChild(toast);
+  if (window.lucide) window.lucide.createIcons();
+  setTimeout(() => toast.remove(), 3000);
+}
 
 class AppRouter {
   constructor() {
     this.currentRoute = 'dashboard';
     this.routeParams = {};
     this.container = document.getElementById('app-main-content');
-    this.navLinks = document.querySelectorAll('.nav-link');
+    this.navLinks = document.querySelectorAll('.nav-item');
   }
 
   init() {
-    // Check initial hash route
     window.addEventListener('hashchange', () => this.handleHashChange());
     this.setupNavClickHandlers();
-
-    // Check LLM config banner
     this.checkLLMBanner();
-
-    // Initial render based on current location hash or default
     this.handleHashChange();
   }
 
   setupNavClickHandlers() {
     this.navLinks.forEach(link => {
       link.addEventListener('click', (e) => {
-        e.preventDefault();
         const route = link.getAttribute('data-route');
-        this.navigate(route);
+        if (route) {
+          this.navigate(route);
+        }
       });
     });
   }
@@ -62,8 +80,8 @@ class AppRouter {
     const [routePart, queryPart] = rawHash.split('?');
     
     this.currentRoute = routePart || 'dashboard';
+    if (this.currentRoute === 'workspace') this.currentRoute = 'problem';
     
-    // Parse query params if available
     const params = { ...this.routeParams };
     if (queryPart) {
       const urlParams = new URLSearchParams(queryPart);
@@ -80,15 +98,29 @@ class AppRouter {
   updateActiveNav() {
     this.navLinks.forEach(link => {
       const route = link.getAttribute('data-route');
-      if (route === this.currentRoute) {
+      if (route === this.currentRoute || (this.currentRoute === 'problem' && route === 'picker')) {
         link.classList.add('active');
       } else {
         link.classList.remove('active');
       }
     });
+
+    const titleElem = document.getElementById('screen-title-text');
+    if (titleElem) {
+      const titleMap = {
+        dashboard: 'DASHBOARD OVERVIEW',
+        picker: 'PROBLEM BANK',
+        problem: 'PRACTICE WORKSPACE',
+        import: 'IMPORT PROBLEM SPEC',
+        settings: 'SETTINGS & CONFIGURATION',
+        history: 'HISTORY LOGBOOK'
+      };
+      titleElem.textContent = titleMap[this.currentRoute] || 'ENGINEERING SIMULATOR';
+    }
   }
 
   renderScreen(route, params) {
+    if (!this.container) this.container = document.getElementById('app-main-content');
     this.container.innerHTML = '';
     
     switch (route) {
@@ -99,6 +131,7 @@ class AppRouter {
         renderProblemPicker(this.container, this);
         break;
       case 'problem':
+      case 'workspace':
         renderProblemView(this.container, this, params);
         break;
       case 'result':
@@ -118,6 +151,7 @@ class AppRouter {
         break;
     }
 
+    if (window.lucide) window.lucide.createIcons();
     window.scrollTo(0, 0);
   }
 }

@@ -16,11 +16,11 @@ export function renderProblemPicker(container, router) {
 
   function renderList() {
     const listContainer = document.getElementById('problem-list-container');
-    const avgUserRating = Math.round(
-      Object.values(ratings).reduce((a, b) => a + b, 0) / CATEGORIES.length
-    );
+    const avgUserRating = Object.values(ratings).length > 0
+      ? Math.round(Object.values(ratings).reduce((a, b) => a + b, 0) / Object.values(ratings).length)
+      : DEFAULT_RATING;
 
-    const userCatRating = currentCategory !== 'all' ? (ratings[currentCategory] || 1000) : avgUserRating;
+    const userCatRating = currentCategory !== 'all' ? (ratings[currentCategory] || DEFAULT_RATING) : avgUserRating;
 
     const filtered = problemBank.filterProblems({
       category: currentCategory,

@@ -3,10 +3,9 @@
  */
 
 let pyodideInstance = null;
-let isLoadingPyodide = false;
 let pyodideLoadPromise = null;
 
-async function initPyodide() {
+export async function initPyodide() {
   if (pyodideInstance) return pyodideInstance;
   if (pyodideLoadPromise) return pyodideLoadPromise;
 
@@ -35,7 +34,14 @@ async function initPyodide() {
 
 export async function evaluatePython(code, tests = []) {
   if (!tests || tests.length === 0) {
-    return { success: true, message: 'No exact test cases defined.', results: [] };
+    // Basic syntax check using Pyodide if no test cases defined
+    try {
+      const pyodide = await initPyodide();
+      pyodide.runPython(code);
+      return { success: true, message: 'Python syntax clean.', results: [] };
+    } catch (err) {
+      return { success: false, error: 'Python Execution Error: ' + err.message, results: [] };
+    }
   }
 
   try {
@@ -43,69 +49,87 @@ export async function evaluatePython(code, tests = []) {
     const results = [];
     let allPassed = true;
 
-    for (let i = 0; i < tests.length; i++) {
-      const test = tests[i];
-      
-      // Setup python execution wrapper
-      const pyScript = `
+    const pyHarness = `
 import json
 import sys
 
-# User code
 ${code}
 
-def __run_test(input_str):
+def __exec_test(input_str, starter_code):
     try:
         val = json.loads(input_str)
-    except:
+    except Exception:
         val = input_str
-    
-    if 'solution' in globals() and callable(globals()['solution']):
-        return solution(val)
-    elif 'run' in globals() and callable(globals()['run']):
-        return run(val)
-    elif 'solve' in globals() and callable(globals()['solve']):
-        return solve(val)
-    else:
-        raise Exception("No solution(input) or run(input) function found.")
 
-__run_test(${JSON.stringify(test.input)})
+    # Discover candidate function dynamically
+    fn = None
+    if 'solution' in globals():
+        fn = globals()['solution']
+    elif 'run' in globals():
+        fn = globals()['run']
+    elif 'solve' in globals():
+        fn = globals()['solve']
+    else:
+        # Check matching function from def in user code
+        import re
+        matches = re.findall(r'def\\s+([a-zA-Z0-9_]+)\\s*\\(', """${code.replace(/\\/g, '\\\\').replace(/`/g, '\\`')}""")
+        for m in matches:
+            if m not in ('__exec_test', '__run_test'):
+                fn = globals()[m]
+                break
+
+    if fn is None:
+        raise Exception("No candidate function found in python script.")
+
+    if isinstance(val, dict):
+        res = fn(**val)
+    elif isinstance(val, list):
+        res = fn(*val)
+    else:
+        res = fn(val)
+
+    if hasattr(res, 'to_py'):
+        res = res.to_py()
+    return json.dumps(res)
 `;
 
+    pyodide.runPython(pyHarness);
+    const execTest = pyodide.globals.get('__exec_test');
+
+    for (let i = 0; i < tests.length; i++) {
+      const test = tests[i];
+      let outputStr = '';
+      let passed = false;
+      let error = null;
+
       try {
-        const pyResult = await pyodide.runPythonAsync(pyScript);
-        const actualStr = typeof pyResult === 'object' && pyResult !== null ? JSON.stringify(pyResult) : String(pyResult);
-        const expectedTrim = String(test.expectedOutput).trim();
-        const actualTrim = String(actualStr).trim();
+        const rawJson = execTest(test.input, '');
+        const actualObj = JSON.parse(rawJson);
+        const expectedObj = JSON.parse(test.expectedOutput);
 
-        const passed = actualTrim === expectedTrim;
-        if (!passed) allPassed = false;
+        const strActual = typeof actualObj === 'object' ? JSON.stringify(actualObj) : String(actualObj);
+        const strExpected = typeof expectedObj === 'object' ? JSON.stringify(expectedObj) : String(expectedObj);
 
-        results.push({
-          index: i + 1,
-          input: test.input,
-          expected: test.expectedOutput,
-          actual: actualTrim,
-          passed
-        });
+        passed = (strActual === strExpected) || (String(rawJson).trim() === String(test.expectedOutput).trim());
+        outputStr = strActual;
       } catch (err) {
-        allPassed = false;
-        results.push({
-          index: i + 1,
-          input: test.input,
-          expected: test.expectedOutput,
-          actual: 'Error: ' + err.message,
-          passed: false
-        });
+        error = err.message || String(err);
+        passed = false;
       }
+
+      if (!passed) allPassed = false;
+      results.push({
+        index: i + 1,
+        input: test.input,
+        expected: test.expectedOutput,
+        actual: error ? 'Error: ' + error : outputStr,
+        passed
+      });
     }
 
+    execTest.destroy();
     return { success: allPassed, results };
   } catch (err) {
-    return {
-      success: false,
-      error: 'Pyodide initialization or runner error: ' + err.message,
-      results: []
-    };
+    return { success: false, error: 'Python Execution Error: ' + err.message, results: [] };
   }
 }

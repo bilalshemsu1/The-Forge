@@ -2,6 +2,11 @@ import { skillRating, CATEGORIES } from '../skillRating.js';
 import { problemBank } from '../problemBank.js';
 import { storage } from '../storage.js';
 
+function escapeHtml(str) {
+  if (typeof str !== 'string') return String(str || '');
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
 export function renderDashboard(container, router) {
   const ratings = skillRating.getRatings();
   const streakInfo = skillRating.getStreakInfo();
@@ -27,13 +32,11 @@ export function renderDashboard(container, router) {
   };
 
   const maxRating = Math.max(1600, ...Object.values(ratings));
-
-  // Render SVG rating curve (Lichess style)
   const svgCurve = renderRatingCurveSVG(ratingHistory);
 
   container.innerHTML = `
     <div class="dashboard-screen">
-      <!-- Instrument Header (Monkeytype inspired numeric hero) -->
+      <!-- Instrument Header -->
       <div class="dashboard-header card">
         <div class="header-main">
           <h1>THE FORGE</h1>
@@ -59,9 +62,9 @@ export function renderDashboard(container, router) {
       <div class="continue-banner card">
         <div class="continue-text">
           <span class="badge growth-badge">Growth Zone Target</span>
-          <h2>${suggestedProblem ? suggestedProblem.title : 'Explore Problem Bank'}</h2>
+          <h2>${suggestedProblem ? escapeHtml(suggestedProblem.title) : 'Explore Problem Bank'}</h2>
           <p class="meta-line">
-            ${suggestedProblem ? `${categoryLabels[suggestedProblem.category]} • Difficulty Level ${suggestedProblem.difficulty}/10 (${suggestedProblem.difficulty * 150 + 400} Elo)` : ''}
+            ${suggestedProblem ? `${categoryLabels[suggestedProblem.category] || suggestedProblem.category} • Difficulty Level ${suggestedProblem.difficulty}/10 (${suggestedProblem.difficulty * 150 + 400} Elo)` : ''}
           </p>
         </div>
         <button id="btn-continue" class="btn btn-primary btn-large">
@@ -82,8 +85,8 @@ export function renderDashboard(container, router) {
             return `
               <div class="rating-row">
                 <div class="rating-cat">
-                  <span class="cat-icon">${categoryIcons[cat]}</span>
-                  <span class="cat-name">${categoryLabels[cat]}</span>
+                  <span class="cat-icon">${categoryIcons[cat] || '⚙️'}</span>
+                  <span class="cat-name">${categoryLabels[cat] || cat}</span>
                 </div>
                 <div class="bar-container">
                   <div class="bar-fill" style="width: ${pct}%"></div>
@@ -95,7 +98,7 @@ export function renderDashboard(container, router) {
         </div>
       </div>
 
-      <!-- Rating History Curve (Lichess style clean line graph) -->
+      <!-- Rating History Curve -->
       <div class="rating-graph-section card">
         <div class="section-title-row">
           <h2>Rating Progress History</h2>
@@ -118,7 +121,7 @@ export function renderDashboard(container, router) {
             ${history.slice(0, 5).map(item => `
               <div class="history-item-mini">
                 <span class="status-indicator ${item.solved ? 'pass' : 'fail'}">${item.solved ? '✓ PASS' : '✗ FAIL'}</span>
-                <span class="item-title">${item.problemTitle}</span>
+                <span class="item-title">${escapeHtml(item.problemTitle)}</span>
                 <span class="item-delta ${item.ratingDelta >= 0 ? 'pos' : 'neg'}">${item.ratingDelta >= 0 ? '+' : ''}${item.ratingDelta} Elo</span>
                 <span class="item-date">${new Date(item.timestamp).toLocaleDateString()}</span>
               </div>
@@ -138,41 +141,29 @@ export function renderDashboard(container, router) {
   });
 }
 
-function renderRatingCurveSVG(ratingHistory) {
-  if (!ratingHistory || ratingHistory.length < 2) {
-    return `<div class="empty-graph-notice">Complete 2+ problem attempts to generate Elo rating curve graph.</div>`;
+function renderRatingCurveSVG(history) {
+  if (!history || history.length === 0) {
+    return `<div class="empty-graph-msg">No rating history data yet. Complete problems to render your Elo timeline.</div>`;
   }
 
-  const width = 800;
-  const height = 160;
+  const width = 600;
+  const height = 120;
   const padding = 20;
 
-  const points = ratingHistory.slice(-20); // Last 20 rating changes
+  const points = history.slice(-20);
   const ratings = points.map(p => p.rating);
-  const minR = Math.min(800, ...ratings) - 50;
-  const maxR = Math.max(1600, ...ratings) + 50;
+  const minR = Math.min(...ratings, 900);
+  const maxR = Math.max(...ratings, 1200);
 
-  const getX = (index) => padding + (index / (points.length - 1)) * (width - 2 * padding);
-  const getY = (rating) => height - padding - ((rating - minR) / (maxR - minR)) * (height - 2 * padding);
-
-  const pathCoords = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${getX(i).toFixed(1)} ${getY(p.rating).toFixed(1)}`).join(' ');
+  const coords = points.map((p, i) => {
+    const x = padding + (i / Math.max(1, points.length - 1)) * (width - 2 * padding);
+    const y = height - padding - ((p.rating - minR) / Math.max(1, maxR - minR)) * (height - 2 * padding);
+    return `${x},${y}`;
+  });
 
   return `
-    <svg viewBox="0 0 ${width} ${height}" class="rating-svg-chart">
-      <!-- Gridlines -->
-      <line x1="${padding}" y1="${padding}" x2="${width - padding}" y2="${padding}" stroke="#262d3a" stroke-dasharray="4 4" />
-      <line x1="${padding}" y1="${height / 2}" x2="${width - padding}" y2="${height / 2}" stroke="#262d3a" stroke-dasharray="4 4" />
-      <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="#262d3a" stroke-dasharray="4 4" />
-
-      <!-- Rating Curve Line -->
-      <path d="${pathCoords}" fill="none" stroke="#3b82f6" stroke-width="2.5" />
-
-      <!-- Data Dots -->
-      ${points.map((p, i) => `
-        <circle cx="${getX(i).toFixed(1)}" cy="${getY(p.rating).toFixed(1)}" r="3.5" fill="#3b82f6" stroke="#0b0e14" stroke-width="1.5">
-          <title>${p.problemTitle}: ${p.rating} Elo (${p.delta >= 0 ? '+' : ''}${p.delta})</title>
-        </circle>
-      `).join('')}
+    <svg viewBox="0 0 ${width} ${height}" class="rating-svg">
+      <polyline fill="none" stroke="var(--accent-ember)" stroke-width="2.5" points="${coords.join(' ')}" />
     </svg>
   `;
 }

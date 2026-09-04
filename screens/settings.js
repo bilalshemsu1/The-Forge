@@ -1,6 +1,11 @@
 import { storage } from '../storage.js';
 import { getLLMConfig } from '../ai.js';
 
+function escapeAttr(str) {
+  if (typeof str !== 'string') return String(str || '');
+  return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#039;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 export function renderSettings(container, router) {
   const currentConfig = getLLMConfig();
 
@@ -23,7 +28,7 @@ export function renderSettings(container, router) {
               type="url"
               id="llm-url"
               class="input-text"
-              value="${currentConfig.url}"
+              value="${escapeAttr(currentConfig.url)}"
               placeholder="https://api.openai.com/v1/chat/completions"
               required
             />
@@ -35,7 +40,7 @@ export function renderSettings(container, router) {
               type="password"
               id="llm-key"
               class="input-text"
-              value="${currentConfig.apiKey}"
+              value="${escapeAttr(currentConfig.apiKey)}"
               placeholder="Paste your API key here..."
             />
           </div>
@@ -46,7 +51,7 @@ export function renderSettings(container, router) {
               type="text"
               id="llm-model"
               class="input-text"
-              value="${currentConfig.model}"
+              value="${escapeAttr(currentConfig.model)}"
               placeholder="auto"
             />
           </div>
@@ -87,7 +92,6 @@ export function renderSettings(container, router) {
     </div>
   `;
 
-  // LLM Form save
   document.getElementById('llm-settings-form').addEventListener('submit', (e) => {
     e.preventDefault();
     const url = document.getElementById('llm-url').value.trim();
@@ -101,7 +105,6 @@ export function renderSettings(container, router) {
     setTimeout(() => { msg.style.display = 'none'; }, 2000);
   });
 
-  // Export Data
   document.getElementById('btn-export-data').addEventListener('click', () => {
     const jsonStr = storage.exportData();
     const blob = new Blob([jsonStr], { type: 'application/json' });
@@ -113,7 +116,6 @@ export function renderSettings(container, router) {
     URL.revokeObjectURL(url);
   });
 
-  // Import Data
   document.getElementById('import-file-input').addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -131,7 +133,6 @@ export function renderSettings(container, router) {
     reader.readAsText(file);
   });
 
-  // Reset All
   document.getElementById('btn-reset-all').addEventListener('click', () => {
     const confirmation = prompt('TYPE "DELETE" TO CONFIRM: This will permanently erase all ratings, streak, and history.');
     if (confirmation === 'DELETE') {

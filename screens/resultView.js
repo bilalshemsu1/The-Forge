@@ -1,10 +1,24 @@
 import { problemBank } from '../problemBank.js';
 import { storage } from '../storage.js';
 
+function escapeHtml(str) {
+  if (typeof str !== 'string') return String(str || '');
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
 export function renderResultView(container, router, params) {
-  const attempt = params?.attempt;
-  const evalOutput = params?.evalOutput;
-  const problem = problemBank.getProblemById(params?.problemId);
+  let attempt = params?.attempt;
+  let evalOutput = params?.evalOutput;
+  let problem = problemBank.getProblemById(params?.problemId);
+
+  // Fallback to recent history attempt if user refreshed result page
+  if (!attempt) {
+    const history = storage.get('attempt_history', []);
+    if (history.length > 0) {
+      attempt = history[0];
+      problem = problemBank.getProblemById(attempt.problemId);
+    }
+  }
 
   if (!attempt || !problem) {
     container.innerHTML = `
@@ -28,8 +42,8 @@ export function renderResultView(container, router, params) {
           <div class="outcome-badge ${isSolved ? 'pass' : 'fail'}">
             ${isSolved ? '🎉 SOLUTION VERIFIED' : (attempt.isSkip ? '⏭️ SKIPPED' : '❌ ATTEMPT FAILED')}
           </div>
-          <h1>${problem.title}</h1>
-          <p class="subtitle">Category: ${problem.category} | Difficulty: ${problem.difficulty}/10</p>
+          <h1>${escapeHtml(problem.title)}</h1>
+          <p class="subtitle">Category: ${escapeHtml(problem.category)} | Difficulty: ${problem.difficulty}/10</p>
         </div>
 
         <div class="rating-update-box">
@@ -68,7 +82,7 @@ export function renderResultView(container, router, params) {
           
           ${evalOutput?.error ? `
             <div class="eval-error-box">
-              ⚠️ ${evalOutput.error}
+              ⚠️ ${escapeHtml(evalOutput.error)}
             </div>
           ` : ''}
 
@@ -82,21 +96,21 @@ export function renderResultView(container, router, params) {
               <div class="critique-group">
                 <h5>Strengths:</h5>
                 <ul>
-                  ${(evalOutput.aiGrade.strengths || []).map(s => `<li>✓ ${s}</li>`).join('')}
+                  ${(evalOutput.aiGrade.strengths || []).map(s => `<li>✓ ${escapeHtml(s)}</li>`).join('')}
                 </ul>
               </div>
 
               <div class="critique-group">
                 <h5>Gaps & Risks:</h5>
                 <ul>
-                  ${(evalOutput.aiGrade.gaps || []).map(g => `<li>⚠️ ${g}</li>`).join('')}
+                  ${(evalOutput.aiGrade.gaps || []).map(g => `<li>⚠️ ${escapeHtml(g)}</li>`).join('')}
                 </ul>
               </div>
 
               ${evalOutput.aiGrade.followUpQuestion ? `
                 <div class="followup-question-box">
                   <h5>Open Thread Question to Consider:</h5>
-                  <p>💬 "${evalOutput.aiGrade.followUpQuestion}"</p>
+                  <p>💬 "${escapeHtml(evalOutput.aiGrade.followUpQuestion)}"</p>
                 </div>
               ` : ''}
             </div>
@@ -134,11 +148,11 @@ export function renderResultView(container, router, params) {
         <!-- User Reasoning & Retrospective Note -->
         <div class="retro-section card">
           <h4>Reasoning Submitted:</h4>
-          <p class="user-reasoning-quote">"${attempt.userReasoning}"</p>
+          <p class="user-reasoning-quote">"${escapeHtml(attempt.userReasoning)}"</p>
 
           <div class="retro-note-form">
             <label for="retro-note-input">Retrospective Note (What made this hard / what would you do differently?):</label>
-            <textarea id="retro-note-input" class="input-textarea" placeholder="Add personal retrospective insights to save in history log...">${attempt.retroNote || ''}</textarea>
+            <textarea id="retro-note-input" class="input-textarea" placeholder="Add personal retrospective insights to save in history log...">${escapeHtml(attempt.retroNote || '')}</textarea>
             <button id="btn-save-retro" class="btn btn-secondary btn-sm">Save Retrospective Note</button>
             <span id="retro-saved-msg" class="saved-msg" style="display:none;">Saved!</span>
           </div>
@@ -153,7 +167,6 @@ export function renderResultView(container, router, params) {
     </div>
   `;
 
-  // Save Retro Note event
   document.getElementById('btn-save-retro').addEventListener('click', () => {
     const text = document.getElementById('retro-note-input').value.trim();
     const history = storage.get('attempt_history', []);
@@ -169,9 +182,4 @@ export function renderResultView(container, router, params) {
 
   document.getElementById('btn-next-problem').addEventListener('click', () => router.navigate('picker'));
   document.getElementById('btn-view-history').addEventListener('click', () => router.navigate('history'));
-}
-
-function escapeHtml(str) {
-  if (typeof str !== 'string') return String(str);
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
