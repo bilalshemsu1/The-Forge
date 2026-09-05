@@ -4,7 +4,7 @@
 
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 ![Architecture](https://img.shields.io/badge/architecture-Zero--Build--PWA-brightgreen.svg)
-![Problems](https://img.shields.io/badge/problems-56%2B--Seed--Challenges-blue.svg)
+![Problems](https://img.shields.io/badge/problems-106--Active--Challenges-blue.svg)
 ![Languages](https://img.shields.io/badge/languages-Python_3.11_%7C_JavaScript-ember.svg)
 
 ---
